@@ -1,0 +1,115 @@
+
+
+services:
+  caddy:
+    image: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+
+    networks:
+      - app-network
+
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile
+
+    depends_on:
+      - auth-service
+      - event-service
+      - analytics-service
+      - gateway
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app-network
+
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  auth-service:
+    build: ./services/auth-service
+    ports:
+      - "8000:8000"
+
+    dns:
+    - 8.8.8.8
+    - 8.8.4.4
+    environment:
+      - AUTH_PORT=8000
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE=${DATABASE_AUTH}
+      - JWT_COOKIE_EXPIRES_IN=${JWT_COOKIE_EXPIRES_IN}
+      - NODE_ENV=production
+
+    networks:
+      - app-network
+
+  event-service:
+    build: ./services/event-service
+    ports:
+      - "8001:8001"
+    dns:
+    - 8.8.8.8
+    - 8.8.4.4
+    environment:
+      - EVENT_PORT=8001
+      - DATABASE=${DATABASE_EVENT}
+      - JWT_SECRET=${JWT_SECRET}
+      - RABBITMQ_URL=amqp://rabbitmq
+      - NODE_ENV=production
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - app-network
+
+  analytics-service:
+    build: ./services/analytics-service
+    ports:
+      - "8002:8002"
+    dns:
+    - 8.8.8.8
+    - 8.8.4.4
+    environment:
+      - PORT=8002
+      - DATABASE=${DATABASE_ANALYTICS}
+      - JWT_SECRET=${JWT_SECRET}
+      - RABBITMQ_URL=amqp://rabbitmq
+      - REDIS_URL=redis://redis
+      - NODE_ENV=production
+
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - app-network
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "4000:4000"
+    networks:
+      - app-network
+    environment:
+      - PORT=4000
+      - AUTH_SERVICE_URL=http://auth-service:8000
+      - EVENT_SERVICE_URL=http://event-service:8001
+      - ANALYTICS_SERVICE_URL=http://analytics-service:8002
+
+    depends_on:
+      - auth-service
+      - event-service
+      - analytics-service
+
+networks:
+  app-network:
+    driver: bridge

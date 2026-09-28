@@ -1,0 +1,26 @@
+localhost {
+    handle /api/v1/auth/* {
+        reverse_proxy auth-service:8000
+    }
+
+    handle /api/v1/events/* {
+        reverse_proxy event-service:8001
+    }
+
+
+    handle /api/v1/projects/* {
+        reverse_proxy event-service:8001
+    }
+
+    handle /api/v1/analytics/* {
+        reverse_proxy analytics-service:8002
+    }
+
+    handle /graphql {
+        reverse_proxy gateway:4000
+    }
+
+    handle /* {
+        reverse_proxy frontend:3000
+    }
+}
